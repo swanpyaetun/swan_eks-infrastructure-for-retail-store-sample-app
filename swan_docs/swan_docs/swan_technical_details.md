@@ -1,0 +1,269 @@
+# Technical Details
+
+## Table of Contents
+
+- [1. AWS](#1-aws)
+  - [1.1. Route 53 domain and public hosted zone](#11-route-53-domain-and-public-hosted-zone)
+  - [1.2. S3 bucket for Terraform remote state](#12-s3-bucket-for-terraform-remote-state)
+  - [1.3. IAM Role for GitHub Actions to authenticate to AWS](#13-iam-role-for-github-actions-to-authenticate-to-aws)
+- [2. Terraform](#2-terraform)
+  - [2.1. swan_terraform/swan_modules/swan_ecr](#21-swan_terraformswan_modulesswan_ecr)
+  - [2.2. swan_terraform/swan_modules/swan_acm](#22-swan_terraformswan_modulesswan_acm)
+  - [2.3. swan_terraform/swan_modules/swan_s3](#23-swan_terraformswan_modulesswan_s3)
+  - [2.4. swan_terraform/swan_modules/swan_vpc](#24-swan_terraformswan_modulesswan_vpc)
+  - [2.5. swan_terraform/swan_modules/swan_eks](#25-swan_terraformswan_modulesswan_eks)
+  - [2.6. swan_terraform/swan_modules/swan_helm](#26-swan_terraformswan_modulesswan_helm)
+  - [2.7. swan_terraform/swan_environments/swan_production/prod.tfvars](#27-swan_terraformswan_environmentsswan_productionprodtfvars)
+- [3. GitHub Actions](#3-github-actions)
+  - [3.1. .github/workflows/swan_terraform.yml](#31-githubworkflowsswan_terraformyml)
+  - [3.2. .github/workflows/swan_terraform_destroy.yml](#32-githubworkflowsswan_terraform_destroyyml)
+
+## 1. AWS
+
+### 1.1. Route 53 domain and public hosted zone
+
+Route 53 public hosted zone is used, so that Route 53 domain can be accessible from the internet.
+
+### 1.2. S3 bucket for Terraform remote state
+
+S3 bucket is used to store Terraform remote state.
+
+### 1.3. IAM Role for GitHub Actions to authenticate to AWS
+
+GitHub OIDC provider is added in IAM.
+
+IAM role is configured to trust GitHub OIDC provider for swan_eks-infrastructure-for-retail-store-sample-app repository in swanpyaetun organization. IAM role is created with AdministratorAccess.
+
+GitHub Actions authentication to AWS is secured by implementing the following practices:
+1. Not storing long-lived IAM user credentials in GitHub
+2. Using short-lived OIDC tokens with automatic expiration
+
+## 2. Terraform
+
+Related AWS resources are packaged into individual Terraform modules, so that the same infrasturcture can be created easier and faster, and configurations can be standardized across environments and teams.
+
+### 2.1. swan_terraform/swan_modules/swan_ecr
+
+swan_ecr module contains:
+1. private ECR repositories
+2. ECR lifecycle policy for each private ECR repository, which only keeps latest 30 container images
+3. ECR basic scanning for private ECR repositories
+
+The image_tag_mutability for private ECR repositories is set to IMMUTABLE, so that image tags are immutable.
+
+Container images in private ECR repositories are secured by implementing the following practices:
+1. Using private ECR repositories
+2. Enable AES256 encryption_type (Default encryption) for private ECR repositories
+3. ECR basic scanning is configured (Default)
+4. SCAN_ON_PUSH is configured for private ECR repositories
+
+ECR basic scanning is a free service. It only scans for OS vulnerabilities, not software vulnerabilities.
+
+To view ECR basic scanning results, in AWS Management Console, go to ap-southeast-1 region -> Elastic Container Registry -> Private registry -> Repositories. Choose a repository that has container image that you want to view ECR basic scanning result for. Choose an image that you want to view ECR basic scanning result for. Under "Scanning and vulnerabilities", you will see ECR basic scanning result for that image.
+
+### 2.2. swan_terraform/swan_modules/swan_acm
+
+swan_acm module contains:
+1. ACM certificate
+2. Route 53 record to validate the domain
+
+### 2.3. swan_terraform/swan_modules/swan_s3
+
+swan_s3 module contains:
+1. S3 bucket
+2. Block all public access in S3 bucket
+3. Enable Bucket Versioning in S3 bucket
+4. Enable SSE-S3 encryption type (Default encryption) in S3 bucket
+5. S3 bucket policy
+
+S3 bucket is secured by implementing the following practices:
+1. Block all public access
+2. Enable Bucket Versioning
+3. Enable SSE-S3 encryption type (Default encryption)
+4. Deny insecure http traffic with S3 bucket policy
+
+### 2.4. swan_terraform/swan_modules/swan_vpc
+
+swan_vpc module contains:
+1. VPC
+2. public subnets
+3. private subnets
+4. internet gateway
+5. regional NAT gateway
+6. public route tables
+7. private route tables
+
+Internet gateway allows both inbound and outbound traffic between internet and public subnets.
+NAT gateway only allows outbound traffic from private subnets to internet.
+
+Resources in private subnets are secured by implementing the following practices:
+1. Using NAT gateway to disable public access from the internet
+
+High availability in NAT gateway is achieved by implementing the following practices:
+1. Using NAT gateway in Regional availability_mode
+
+Regional NAT Gateway with auto mode is enabled by not specifying availability_zone_address argument in aws_nat_gateway Terraform resource. Regional NAT gateway with auto mode will automatically expand to new AZs and associate EIPs upon detection of an elastic network interface. This reduces management overhead.
+
+### 2.5. swan_terraform/swan_modules/swan_eks
+
+swan_eks module contains:
+1. EKS cluster IAM role
+2. EKS cluster
+3. EKS node IAM role
+4. system EKS node group
+5. vpc-cni EKS addon
+6. coredns EKS addon
+7. kube-proxy EKS addon
+8. eks-pod-identity-agent EKS addon
+9. eks-node-monitoring-agent EKS addon
+10. access entry for CI IAM role
+11. EKS cluster admin IAM role
+12. access entry for EKS cluster admin IAM role
+13. Argo CD Image Updater IAM role
+14. Argo CD Image Updater pod identity association
+15. AWS Load Balancer Controller IAM role
+16. AWS Load Balancer Controller pod identity association
+17. External DNS IAM role
+18. External DNS pod identity association
+19. Karpenter interruption SQS queue
+20. Karpenter interruption SQS queue policy
+21. EventBridge rules
+22. Karpenter IAM role
+23. Karpenter pod identity association
+<br>
+
+EKS control plane cross-account ENIs are deployed in private subnets. Public endpoint is enabled for EKS cluster. Private endpoint is enabled for EKS cluster. "API" authentication_mode is used, so that access entries can be used in the cluster. Automatically giving cluster admin permissions to the cluster creator is disabled.
+
+System EKS node group nodes are deployed in private subnets. "ON_DEMAND" capacity_type is used. During update, maximum 1 node can be unavailable, and node is created first before deletion. Node auto repair is enabled. Maximum 1 node can be repaired in parallel, and node auto repair actions stop if more than 5 nodes are unhealthy. Label and taint are applied to the system EKS node group nodes, so that only system workloads can run on system EKS node group nodes.
+<br><br>
+
+vpc-cni EKS addon enables pod networking within EKS cluster. Prefix Delegation is enabled to increase the number of IP addresses available to nodes and increase pod density per node. With Prefix Delegation enabled, vpc-cni assigns /28 (16 IP addresses) IPv4 address prefixes, instead of assigning individual IPv4 addresses to ENIs of the nodes. vpc-cni allocates IP addresses to pods from the prefixes assigned to ENIs. vpc-cni pre-allocates a prefix for faster pod startup by maintaining a warm pool. Network policy is enabled in vpc-cni to enforce Kubernetes network policies.
+
+coredns EKS addon enables service discovery within EKS cluster. nodeSelector and toleration are applied to coredns pods, so that they can run on system EKS node group nodes.
+
+kube-proxy EKS addon enables service networking within EKS cluster.
+
+eks-pod-identity-agent EKS addon is used, so that IAM roles can be associated with Kubernetes service accounts.
+
+eks-node-monitoring-agent EKS addon enables automatic detection of node health issues, so that more node conditions for EKS node auto repair can be detected.
+<br><br>
+
+An access entry is created for CI IAM role, and AmazonEKSClusterAdminPolicy is assigned to CI IAM role.
+
+EKS cluster admin is created as an IAM role. An access entry is created for EKS cluster admin IAM role, and AmazonEKSClusterAdminPolicy is assigned to EKS cluster admin IAM role.
+<br><br>
+
+EKS cluster is secured by implementing the following practices:
+1. Envelope encryption is enabled in EKS cluster (Default)
+2. Enable private endpoint for EKS api server, so that worker node traffic to EKS api server endpoint will stay within VPC
+3. Automatically giving cluster admin permissions to the cluster creator is disabled
+4. System EKS node group nodes are deployed in private subnets
+5. vpc-cni enforcing Kubernetes network policies
+6. Creating EKS cluster admin as an IAM role that have short-term credentials, rather than an IAM user that have long-term credentials
+<br>
+
+AmazonEC2ContainerRegistryReadOnly policy is attached to Argo CD Image Updater IAM role. Argo CD Image Updater IAM role is associated with "argocd-image-updater" service account in "argocd" namespace, using eks pod identity.
+
+AWS Load Balancer Controller IAM role is associated with "aws-load-balancer-controller" service account in "kube-system" namespace, using eks pod identity.
+
+External DNS IAM role is associated with "external-dns" service account in "kube-system" namespace, using eks pod identity.
+<br><br>
+
+Karpenter interruption SQS queue is secured by implementing the following practices:
+1. Encrypt data at rest by enabling SSE-SQS encryption type
+2. Encrypt data in transit (Default)
+3. Deny insecure http traffic with SQS queue policy
+
+SQS queue policy ensures only EventBridge and SQS services can send messages to SQS queue.
+
+EventBridge sends "AWS Health Event", "EC2 Spot Instance Interruption Warning", "EC2 Instance Rebalance Recommendation", and "EC2 Instance State-change Notification" events to the SQS queue. Karpenter reads the events from SQS queue. When Karpenter receives interruption events, it gracefully drains the affected node and provisions a replacement so that workloads can be rescheduled.
+
+Karpenter IAM role is associated with "karpenter" service account in "kube-system" namespace, using eks pod identity.
+
+### 2.6. swan_terraform/swan_modules/swan_helm
+
+swan_helm module contains:
+1. Argo CD
+2. Argo CD Image Updater
+3. AWS Load Balancer Controller
+4. External DNS
+5. Metrics Server
+6. Karpenter
+
+Argo CD continuously synchronizes applications defined in git repository with the Kubernetes cluster, ensuring the cluster state matches the declared configuration.
+
+Argo CD Image Updater monitors ECR for new container image tags, updates the container image references in the git repository, and allows Argo CD to deploy the updated tag to the Kubernetes cluster.
+
+AWS Load Balancer Controller watches Kubernetes ingress and service objects and creates or updates corresponding AWS load balancers (such as application load balancers and network load balancers).
+
+ExternalDNS automatically synchronizes Kubernetes ingress and service hostnames with Route 53, creating, updating, and removing DNS records so that they always reflect the current cluster state.
+
+Metrics Server provides resource usage data (CPU, memory) for nodes and pods, for monitoring and auto-scaling workloads.
+
+Karpenter is a cluster autoscaler that automatically provisions and scales nodes based on workload demand. It observes pending pods and dynamically launches or terminates nodes to optimize cost, and resource utilization.
+
+nodeSelector and toleration are applied to the above resources, so that they can run on system EKS node group nodes.
+
+### 2.7. swan_terraform/swan_environments/swan_production/prod.tfvars
+
+```hcl
+# swan_vpc
+swan_vpc_cidr_block            = "10.0.0.0/16"
+swan_availability_zones        = ["ap-southeast-1a", "ap-southeast-1b", "ap-southeast-1c"]
+swan_public_subnet_cidr_blocks = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
+swan_public_subnet_tags = {
+  "kubernetes.io/role/elb" = "1"
+}
+swan_private_subnet_cidr_blocks = ["10.0.16.0/20", "10.0.32.0/20", "10.0.48.0/20"]
+swan_private_subnet_tags = {
+  "kubernetes.io/role/internal-elb" = "1"
+  # for Karpenter auto-discovery
+  "karpenter.sh/discovery" = "swan_production_eks_cluster"
+}
+```
+To have a lot of ip addresses, /16 is used for VPC which gives 65536 ip addresses, and /20 is used for private subnets which gives 4096 ip addresses per private subnet.
+
+The public subnets tag "kubernetes.io/role/elb" signals AWS Load Balancer Controller in EKS cluster that these public subnets are for internet-facing load balancers.
+
+The private subnets tag "kubernetes.io/role/internal-elb" signals AWS Load Balancer Controller in EKS cluster that these private subnets are for internal load balancers. The private subnets tag "karpenter.sh/discovery" is for Karpenter auto-discovery, so that Karpenter can launch nodes in these private subnets for swan_production_eks_cluster.
+
+## 3. GitHub Actions
+
+### 3.1. .github/workflows/swan_terraform.yml
+
+"Provision AWS Infrastructure with Terraform" pipeline can be triggered in 3 ways:
+1. The CI/CD pipeline runs when a pull request is opened against the main branch.
+2. The CI/CD pipeline runs when a direct push is made to the main branch.
+3. The CI/CD pipeline runs when a user manually triggers it.
+
+swan_terraform_plan job does the following steps:
+1. checkout repository
+2. set up Terraform in the runner
+3. configure AWS credentials using OIDC
+4. terraform init
+5. check Terraform format
+6. check whether the configuration is valid
+7. terraform plan and generate Terraform plan file
+8. upload Terraform plan file only if the event is push or manually triggered
+
+swan_terraform_apply job runs after swan_terraform_plan job succeeds. swan_terraform_apply job runs only if the event is push or manually triggered. swan_terraform_apply job does the following steps:
+1. checkout repository
+2. set up Terraform in the runner
+3. configure AWS credentials using OIDC
+4. terraform init
+5. download Terraform plan file
+6. create Terraform resources using Terraform plan file
+
+Terraform plan file is used so that only reviewed resources during plan stage are applied, and no modification is done between plan and apply stage.
+
+### 3.2. .github/workflows/swan_terraform_destroy.yml
+
+"Terraform Destroy" pipeline can be triggered in 1 way:
+1. The CI/CD pipeline runs when a user manually triggers it.
+
+swan_terraform_destroy job does the following steps:
+1. checkout repository
+2. set up Terraform in the runner
+3. configure AWS credentials using OIDC
+4. terraform init
+5. delete all Terraform resources
