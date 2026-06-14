@@ -2,7 +2,7 @@
 swan_s3_bucket_name = "swan-terraform-backend"
 
 # swan_ecr
-swan_private_ecr_namespace = "retail-store-sample-app"
+swan_private_ecr_namespace = "swan_retail-store-sample-app"
 swan_private_ecr_repository_names = [
   "cart",
   "catalog",

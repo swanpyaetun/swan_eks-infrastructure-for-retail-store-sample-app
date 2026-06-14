@@ -78,4 +78,4 @@ Run "Terraform Destroy" pipeline to destroy EKS Infrastructure.<br>
 
 ## 4. Additional Information
 
-GitHub Actions CI/CD pipelines for microservices, and Kubernetes manifests: [https://github.com/swanpyaetun/retail-store-sample-app](https://github.com/swanpyaetun/retail-store-sample-app)
+GitHub Actions CI/CD pipelines for microservices, and Kubernetes manifests: [https://github.com/swanpyaetun/swan_retail-store-sample-app](https://github.com/swanpyaetun/swan_retail-store-sample-app)

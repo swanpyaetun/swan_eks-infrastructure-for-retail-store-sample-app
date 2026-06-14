@@ -4,7 +4,7 @@
 
 - [1. AWS](#1-aws)
   - [1.1. Route 53 domain and public hosted zone](#11-route-53-domain-and-public-hosted-zone)
-  - [1.2. Create AWS resources required for swanpyaetun/swan_eks-infrastructure-for-retail-store-sample-app Project, and swanpyaetun/retail-store-sample-app Project](#12-create-aws-resources-required-for-swanpyaetunswan_eks-infrastructure-for-retail-store-sample-app-project-and-swanpyaetunretail-store-sample-app-project)
+  - [1.2. Create AWS resources required for swanpyaetun/swan_eks-infrastructure-for-retail-store-sample-app Project, and swanpyaetun/swan_retail-store-sample-app Project](#12-create-aws-resources-required-for-swanpyaetunswan_eks-infrastructure-for-retail-store-sample-app-project-and-swanpyaetunswan_retail-store-sample-app-project)
 - [2. GitHub Actions](#2-github-actions)
   - [2.1. Create repository secret](#21-create-repository-secret)
 
@@ -14,7 +14,7 @@
 
 A domain called "swanpyaetun.com" must be present in Route 53 Registered domains. A public hosted zone called "swanpyaetun.com" must be present in Route 53 Hosted zones.
 
-### 1.2. Create AWS resources required for swanpyaetun/swan_eks-infrastructure-for-retail-store-sample-app Project, and swanpyaetun/retail-store-sample-app Project
+### 1.2. Create AWS resources required for swanpyaetun/swan_eks-infrastructure-for-retail-store-sample-app Project, and swanpyaetun/swan_retail-store-sample-app Project
 
 ```bash
 cd ~/Desktop/
@@ -51,9 +51,9 @@ Run this command.
 ```bash
 terraform apply -auto-approve -var-file=prerequisites.tfvars
 ```
-Run this command to create AWS resources required for swanpyaetun/swan_eks-infrastructure-for-retail-store-sample-app project, and swanpyaetun/retail-store-sample-app project.<br>
+Run this command to create AWS resources required for swanpyaetun/swan_eks-infrastructure-for-retail-store-sample-app project, and swanpyaetun/swan_retail-store-sample-app project.<br>
 S3 bucket and CI IAM role are created for swanpyaetun/swan_eks-infrastructure-for-retail-store-sample-app project.<br>
-CI IAM role, private ECR repositories, and ACM certificate are created for swanpyaetun/retail-store-sample-app project.
+CI IAM role, private ECR repositories, and ACM certificate are created for swanpyaetun/swan_retail-store-sample-app project.
 <br><br>
 
 ```hcl

@@ -48,11 +48,11 @@ resource "aws_iam_role_policy_attachment" "swan_githubactions_terraform_iam_role
   policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"
 }
 
-################################################################
-# Prerequisites for swanpyaetun/retail-store-sample-app Project
-################################################################
+#####################################################################
+# Prerequisites for swanpyaetun/swan_retail-store-sample-app Project
+#####################################################################
 
-# CI IAM Role for swanpyaetun/retail-store-sample-app Project
+# CI IAM Role for swanpyaetun/swan_retail-store-sample-app Project
 resource "aws_iam_role" "swan_githubactions_ecr_iam_role" {
   name = "swan_githubactions_ecr_iam_role"
 
@@ -70,7 +70,7 @@ resource "aws_iam_role" "swan_githubactions_ecr_iam_role" {
             "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
           }
           StringLike = {
-            "token.actions.githubusercontent.com:sub" = "repo:swanpyaetun/retail-store-sample-app:*"
+            "token.actions.githubusercontent.com:sub" = "repo:swanpyaetun/swan_retail-store-sample-app:*"
           }
         }
       }
@@ -78,7 +78,7 @@ resource "aws_iam_role" "swan_githubactions_ecr_iam_role" {
   })
 
   tags = {
-    Project = "retail-store-sample-app"
+    Project = "swan_retail-store-sample-app"
   }
 }
 
