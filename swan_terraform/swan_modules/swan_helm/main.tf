@@ -90,3 +90,12 @@ resource "helm_release" "swan_karpenter_helm_release" {
     })
   ]
 }
+
+resource "helm_release" "swan_kyverno_helm_release" {
+  name       = "kyverno"
+  repository = "https://kyverno.github.io/kyverno/"
+  chart      = "kyverno"
+  version    = "3.8.1"
+  namespace  = "kube-system"
+  values     = [file("${path.module}/swan_helm_values/kyverno.yaml")]
+}
