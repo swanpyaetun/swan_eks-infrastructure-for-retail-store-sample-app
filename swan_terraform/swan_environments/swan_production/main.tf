@@ -25,6 +25,7 @@ module "swan_eks" {
   swan_eks_node_monitoring_agent_eks_addon_version = var.swan_eks_node_monitoring_agent_eks_addon_version
   swan_domain_name                                 = var.swan_domain_name
   swan_ci_iam_role_arn                             = var.swan_ci_iam_role_arn
+  depends_on                                       = [module.swan_vpc]
 }
 
 module "swan_helm" {
